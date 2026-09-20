@@ -1,79 +1,93 @@
 name: Repository config actions
 
 on:
-    push:
-        branches: [main]
-    workflow_dispatch: # Manual trigger
-        inputs:
-            locale_override:
-                description: "Force locale (ko|en). If empty, detect from actor profile location."
-                required: false
-                type: choice
-                options:
-                    - ""
-                    - ko
-                    - en
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+#   issues:
+#     types: [opened, reopened, edited, closed]
 
 permissions:
-    contents: write
-    pull-requests: write # Pull request
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-    pull_request_localization:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  pull_request_localization:
+    # Don`t runs-on ubuntu-latest bind to specific version [ex : ubuntu-24.04]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-            - name: Detect locale from actor profile
-              id: detect_locale
-              uses: actions/github-script@v7
-              with:
-                script: |
-                    const actor = context.actor;
-                    const override = `${{ toJson(github.event.inputs.locale_override) || '""' }}`.replace(/^"|"$/g, '');
+      - name: Detect locale and update PR body
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
 
-                    if (override === 'ko' || override === 'en') {
-                      core.info(`Using locale override: ${override}`);
-                      core.setOutput('locale', override);
-                      return;
-                    }
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed('No pull_request payload found.');
+              return;
+            }
 
-                    const { data: user } = await github.rest.users.getByUsername({ username: actor });
-                    const location = (user.location || '').trim();
+            const author = pr.user.login;
+            const { data: user } = await github.rest.users.getByUsername({ username: author });
+            const location = (user.location || '').trim();
 
-                    // Hard rule:
-                    // - Korea-related locations => ko
-                    // - all other cases => en
-                    // Nationality data is not available via GitHub event/API.
-                    const koHints = [
-                      /\bsouth korea\b/i,
-                      /\brepublic of korea\b/i,
-                      /\bkorea\b/i,
-                      /\bkr\b/i,
-                      /대한민국/i,
-                      /한국/i,
-                      /서울/i,
-                      /부산/i,
-                      /인천/i
-                    ];
+            // Hard rule:
+            // - Korea-related locations => ko
+            // - all other cases => en
+            // Nationality data is not available via GitHub event/API.
+            const koHints = [
+              /\bsouth korea\b/i,
+              /\brepublic of korea\b/i,
+              /\bkorea\b/i,
+              /\bkr\b/i,
+            ];
 
-                    const locale = koHints.some((re) => re.test(location)) ? 'ko' : 'en';
+            const locale = koHints.some((re) => re.test(location)) ? 'ko' : 'en';
+            const templateDir = path.join(process.cwd(), '.github', 'PULL_REQUEST_TEMPLATE');
 
-                    core.info(`actor=${actor}, location='${location}', locale=${locale}`);
-                    core.setOutput('locale', locale);
+            if (!fs.existsSync(templateDir)) {
+              core.setFailed(`Template directory not found: ${templateDir}`);
+              return;
+            }
 
-            - name: Apply PR localization
-              env:
-                LOCALE: ${{ steps.detect_locale.outputs.locale }}
-              run: |
-                echo "Selected locale: ${LOCALE}"
-                if [ "${LOCALE}" = "ko" ]; then
-                  echo "Use Korean PR localization flow"
-                  # Example:
-                  # cp .github/PULL_REQUEST_TEMPLATE.ko.md .github/pull_request_template.md
-                else
-                  echo "Use English PR localization flow"
-                  # Example:
-                  # cp .github/PULL_REQUEST_TEMPLATE.md .github/pull_request_template.md
-                fi
+            const allTemplates = fs
+              .readdirSync(templateDir, { withFileTypes: true })
+              .filter((entry) => entry.isFile())
+              .map((entry) => entry.name);
+
+            const pickTemplateByLocale = (targetLocale) => {
+              const candidates = allTemplates
+                .filter((name) => new RegExp(`\\.${targetLocale}\\.md$`, 'i').test(name))
+                .sort((a, b) => a.localeCompare(b));
+
+              return candidates.length > 0
+                ? path.join(templateDir, candidates[0])
+                : null;
+            };
+
+            let templatePath = pickTemplateByLocale(locale);
+            if (!templatePath) {
+              core.warning(`No .${locale}.md template found. Falling back to .en.md.`);
+              templatePath = pickTemplateByLocale('en');
+            }
+
+            if (!templatePath) {
+              core.setFailed('No PR template found. Expected at least one .en.md file in .github/PULL_REQUEST_TEMPLATE.');
+              return;
+            }
+
+            const body = fs.readFileSync(templatePath, 'utf8');
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body,
+            });
+
+            core.info(`author=${author}, location='${location}', locale=${locale}, template='${templatePath}'`);
