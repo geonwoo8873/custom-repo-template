@@ -45,11 +45,8 @@ jobs:
               /\brepublic of korea\b/i,
               /\bkorea\b/i,
               /\bkr\b/i,
-<<<<<<< HEAD
-=======
               /대한민국/i,
               /한국/i,
->>>>>>> 146def66e621e98dc7a3a9767beb35e614bd3e81
             ];
 
             const locale = koHints.some((re) => re.test(location)) ? 'ko' : 'en';
