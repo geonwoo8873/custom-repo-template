@@ -1,0 +1,71 @@
+const fs = require('fs');
+const path = require('path');
+
+async function run({ github, context, core }) {
+  const pr = context.payload.pull_request;
+  if (!pr) {
+    core.setFailed('No pull_request payload found.');
+    return;
+  }
+
+  const author = pr.user.login;
+  const { data: user } = await github.rest.users.getByUsername({ username: author });
+  const location = (user.location || '').trim();
+
+  // Hard rule:
+  // - Korea-related locations => ko
+  // - all other cases => en
+  const koHints = [
+    /\bsouth korea\b/i,
+    /\brepublic of korea\b/i,
+    /대한민국/i,
+    /한국/i,
+  ];
+
+  const locale = koHints.some((re) => re.test(location)) ? 'ko' : 'en';
+  const templateDir = path.join(process.cwd(), '.github', 'PULL_REQUEST_TEMPLATE');
+
+  if (!fs.existsSync(templateDir)) {
+    core.setFailed(`Template directory not found: ${templateDir}`);
+    return;
+  }
+
+  const allTemplates = fs
+    .readdirSync(templateDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name);
+
+  const pickTemplateByLocale = (targetLocale) => {
+    const candidates = allTemplates
+      .filter((name) => new RegExp(`\\.${targetLocale}\\.md$`, 'i').test(name))
+      .sort((a, b) => a.localeCompare(b));
+
+    return candidates.length > 0
+      ? path.join(templateDir, candidates[0])
+      : null;
+  };
+
+  let templatePath = pickTemplateByLocale(locale);
+  if (!templatePath) {
+    core.warning(`No .${locale}.md template found. Falling back to .en.md.`);
+    templatePath = pickTemplateByLocale('en');
+  }
+
+  if (!templatePath) {
+    core.setFailed('No PR template found. Expected at least one .en.md file in .github/PULL_REQUEST_TEMPLATE.');
+    return;
+  }
+
+  const body = fs.readFileSync(templatePath, 'utf8');
+
+  await github.rest.pulls.update({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: pr.number,
+    body,
+  });
+
+  core.info(`author=${author}, location='${location}', locale=${locale}, template='${templatePath}'`);
+}
+
+module.exports = { run };
