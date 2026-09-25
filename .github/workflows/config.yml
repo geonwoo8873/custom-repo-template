@@ -25,7 +25,7 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const { run } = require('./.github/scripts/update-pr-template.go');
+            const { run } = require('./.github/scripts/update-pr-template.js');
             return run({ github, context, core });
       
       # - name: Setup Go
