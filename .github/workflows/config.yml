@@ -2,9 +2,9 @@ name: Repository config actions
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
-#   issues:
-#     types: [opened, reopened, edited, closed]
+    types: [opened, reopened, ready_for_review, closed]
+  issues:
+    types: [opened, reopened, edited, closed]
 
 permissions:
   contents: read
@@ -25,5 +25,5 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            const { run } = require('./.github/scripts/update-pr-template.js');
+            const { run } = require('./.github/scripts/update-pr-template.go');
             return run({ github, context, core });
