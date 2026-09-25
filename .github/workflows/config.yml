@@ -21,9 +21,17 @@ jobs:
         # `actions/checkout@v7` Currently using the latest v7 version of the github checkout action
         uses: actions/checkout@v7
 
-      - name: Detect locale and update PR body
-        uses: actions/github-script@v9
+      # - name: Detect locale and update PR body
+      #   uses: actions/github-script@v9
+      #   with:
+      #     script: |
+      #       const { run } = require('./.github/scripts/update-pr-template.go');
+      #       return run({ github, context, core });
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          script: |
-            const { run } = require('./.github/scripts/update-pr-template.go');
-            return run({ github, context, core });
+          go-version: '1.24'
+      
+      - name: Run localization script
+        run: go run ./.github/scripts/update-pr-template.go
