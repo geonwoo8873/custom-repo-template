@@ -2,7 +2,6 @@
 
 > [!IMPORTANT]
 > * **`CODE_OF_CONDUCT` is a document established to determine standards of conduct among users with the goal of building a healthy community. This aims to prevent unintended problems and ensures that no malicious intent is exercised for any reason. It also aims to contribute to a better development culture by demonstrating respect among users. Furthermore, it specifies that the community standards of conduct cite the Contributor Pledge 3.0 Code of Conduct from the [Contributor Covenant](https://www.contributor-covenant.org/ko/version/3/0/code_of_conduct/).**
-> * **The Korean version of the Community Standards of Conduct guidelines can be found in the following [CODE_OF_CONDUCT.ko.md](https://github.com/geonwoo8873/custom-repo-template/blob/main/CODE_OF_CONDUCT.ko.md) file.**
 
 ## Our Pledge
 
