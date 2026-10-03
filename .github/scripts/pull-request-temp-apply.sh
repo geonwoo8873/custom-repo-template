@@ -21,28 +21,28 @@ require_command() {
 require_command jq
 require_command curl
 
-GITHUB_REQUIRED_ENV=(
-    "GITHUB_TOKEN" # 0
-    "GITHUB_REPOSITORY" # 1 
-    "GITHUB_EVENT_PATH" # 2
-    "GITHUB_API_URL" # 3
-)
-
-for env_var in "${GITHUB_REQUIRED_ENV[@]}"; do
-  if [ -z "${!env_var:-}" ]; then
-    fail "$env_var is required."
-  fi
-done
-
-PR_NUMBER="$(jq -r '.pull_request.number // empty' "${GITHUB_REQUIRED_ENV[2]}")"
-AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "${GITHUB_REQUIRED_ENV[2]}")"
-
-if [ ! -f "${GITHUB_REQUIRED_ENV[2]:-}" ]; then
-    fail "GitHub event payload file does not exist: ${GITHUB_REQUIRED_ENV[2]}"
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  fail "GITHUB_TOKEN is required."
 fi
-if [ -z "${!GITHUB_REQUIRED_ENV[3]:-}" ]; then
-  export "${GITHUB_REQUIRED_ENV[3]}"="https://api.github.com"
+
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+  fail "GITHUB_REPOSITORY is required."
 fi
+
+if [ -z "${GITHUB_EVENT_PATH:-}" ]; then
+  fail "GITHUB_EVENT_PATH is required."
+fi
+
+if [ ! -f "$GITHUB_EVENT_PATH" ]; then
+  fail "GitHub event payload file does not exist: $GITHUB_EVENT_PATH"
+fi
+
+if [ -z "${GITHUB_API_URL:-}" ]; then
+  GITHUB_API_URL="https://api.github.com"
+fi
+
+PR_NUMBER="$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")"
+AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "$GITHUB_EVENT_PATH")"
 
 if [ -z "$PR_NUMBER" ] || [ -z "$AUTHOR_LOGIN" ]; then
   fail "No pull_request payload found or required fields are missing."
@@ -51,17 +51,9 @@ fi
 USER_RESPONSE="$(
   curl -fsSL \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${!GITHUB_REQUIRED_ENV[3]}/users/$AUTHOR_LOGIN"
-)"
-
-USER_RESPONSE="$(
-  curl -fsSL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${!GITHUB_REQUIRED_ENV[3]}/users/$AUTHOR_LOGIN"
+    "$GITHUB_API_URL/users/$AUTHOR_LOGIN"
 )"
 
 LOCATION="$(printf '%s' "$USER_RESPONSE" | jq -r '.location // ""' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -119,10 +111,10 @@ PAYLOAD="$(jq -n --arg body "$PR_BODY" '{body: $body}')"
 
 curl -fsSL -X PATCH \
   -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
-  "${!GITHUB_REQUIRED_ENV[3]}/repos/${!GITHUB_REQUIRED_ENV[1]}/pulls/$PR_NUMBER" \
+  "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
   -d "$PAYLOAD" >/dev/null
 
 echo "author=$AUTHOR_LOGIN, location='$LOCATION', locale=$LOCALE, template='$TEMPLATE_PATH'"
