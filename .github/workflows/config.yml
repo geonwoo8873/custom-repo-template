@@ -21,6 +21,7 @@ jobs:
 
       - name: Detect locale and update PR body
         shell: bash
+        # 권한을 `x [1]`로 부여해 스크립트를 실행할 수 있도록 한다.
         run: |
           chmod +x .github/scripts/pull-request-temp-apply.sh
           ./.github/scripts/pull-request-temp-apply.sh
