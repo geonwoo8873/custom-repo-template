@@ -60,17 +60,9 @@ USER_RESPONSE="$(
 
   curl -fsSL \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${!GITHUB_REQUIRED_ENV[3]}/users/$AUTHOR_LOGIN"
-)"
-
-USER_RESPONSE="$(
-  curl -fsSL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${!GITHUB_REQUIRED_ENV[3]}/users/$AUTHOR_LOGIN"
+    "$GITHUB_API_URL/users/$AUTHOR_LOGIN"
 )"
 
 LOCATION="$(printf '%s' "$USER_RESPONSE" | jq -r '.location // ""' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -128,10 +120,10 @@ PAYLOAD="$(jq -n --arg body "$PR_BODY" '{body: $body}')"
 
 curl -fsSL -X PATCH \
   -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
-  "${!GITHUB_REQUIRED_ENV[3]}/repos/${!GITHUB_REQUIRED_ENV[1]}/pulls/$PR_NUMBER" \
+  "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
   -d "$PAYLOAD" >/dev/null
 
 echo "author=$AUTHOR_LOGIN, location='$LOCATION', locale=$LOCALE, template='$TEMPLATE_PATH'"
