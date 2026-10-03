@@ -21,6 +21,7 @@ require_command() {
 require_command jq
 require_command curl
 
+# PR 정보 요청에 필요한 GitHub 환경 변수를 Array 형태로 정의
 GITHUB_REQUIRED_ENV=(
     "GITHUB_TOKEN" # 0
     "GITHUB_REPOSITORY" # 1 
@@ -28,27 +29,35 @@ GITHUB_REQUIRED_ENV=(
     "GITHUB_API_URL" # 3
 )
 
+# 필수 GitHub 환경 변수가 설정되어 있는지 확인
 for env_var in "${GITHUB_REQUIRED_ENV[@]}"; do
   if [ -z "${!env_var:-}" ]; then
     fail "$env_var is required."
   fi
 done
 
-PR_NUMBER="$(jq -r '.pull_request.number // empty' "${GITHUB_REQUIRED_ENV[2]}")"
-AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "${GITHUB_REQUIRED_ENV[2]}")"
+# PR 번호와 작성자 로그인 정보를 GitHub 이벤트 페이로드에서 추출
+PR_NUMBER="$(jq -r '.pull_request.number // empty' "${!GITHUB_REQUIRED_ENV[2]}")"
+AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "${!GITHUB_REQUIRED_ENV[2]}")"
 
-if [ ! -f "${GITHUB_REQUIRED_ENV[2]:-}" ]; then
-    fail "GitHub event payload file does not exist: ${GITHUB_REQUIRED_ENV[2]}"
+# GitHub 이벤트 페이로드 파일이 존재하는지 확인
+if [ ! -f "${!GITHUB_REQUIRED_ENV[2]:-}" ]; then
+    fail "GitHub event payload file does not exist: ${!GITHUB_REQUIRED_ENV[2]}"
 fi
+
+# GitHub API URL이 설정되어 있지 않으면 기본값으로 설정
 if [ -z "${!GITHUB_REQUIRED_ENV[3]:-}" ]; then
-  export "${GITHUB_REQUIRED_ENV[3]}"="https://api.github.com"
+  export "${!GITHUB_REQUIRED_ENV[3]}"="https://api.github.com"
 fi
 
+# PR 번호와 작성자 로그인 정보가 올바르게 추출되었는지 확인
 if [ -z "$PR_NUMBER" ] || [ -z "$AUTHOR_LOGIN" ]; then
   fail "No pull_request payload found or required fields are missing."
 fi
 
+# 작성자 정보를 GitHub API를 통해 조회
 USER_RESPONSE="$(
+
   curl -fsSL \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer ${!GITHUB_REQUIRED_ENV[0]}" \
