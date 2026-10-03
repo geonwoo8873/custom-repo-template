@@ -1,0 +1,30 @@
+name: Test PR Automation
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+#   issues:
+#     types: [opened, reopened, edited, closed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  pull_request_localization:
+    # Don`t runs-on ubuntu-latest bind to specific version [ex : ubuntu-24.04]
+    # Using a specific version of Ubuntu to ensure consistent environment
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        # `actions/checkout@v7` Currently using the latest v7 version of the GitHub checkout action
+        uses: actions/checkout@v7
+
+      - name: Detect locale and update PR body
+        shell: bash
+        run: |
+          chmod +x .github/scripts/pull-request-temp-apply.sh
+          ./.github/scripts/pull-request-temp-apply.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
