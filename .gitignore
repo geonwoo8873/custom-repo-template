@@ -1,11 +1,35 @@
-# IDEs
-.vscode
-.vs
-.idea
+# Private
+/docs/private-attachment
+.env
 
-# C# ignore directorys
-**/obj/
-**/bin/
+#### IDE
+.vs/
+.vscode/
+.idea/
 
-# Token Secret
-**/.env
+# Visual Studio
+Debug/
+Release/
+x64/
+x86/
+
+# macOS
+.DS_Store
+Thumbs.db
+
+#### Programming Language
+# Node.js
+node_modules/
+packages/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
