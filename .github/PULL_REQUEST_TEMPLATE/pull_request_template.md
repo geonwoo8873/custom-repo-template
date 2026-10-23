@@ -9,7 +9,10 @@
 <!-- Explain why this change is needed. -->
 
 ## Key Changes
-<!-- Summarize what was changed. -->
+- List of commit SHAs:
+  __COMMIT_SHA__
+
+- Changes:
 
 ## Test and Validation
 - [ ] Verified changes locally
