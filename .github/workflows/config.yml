@@ -12,21 +12,18 @@ permissions:
 
 jobs:
   pull_request_localization:
-    # Warning: Ubuntu 버전을 명시적해야 하며 latest 태그를 사용하는 것은 권장되지 않는다. [ex : ubuntu-24.04]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        # GitHub Actions에서 제공하는 공식 체크아웃 액션으로, 리포지토리의 코드를 워크플로우 환경에 가져오는 데 사용된다.
         uses: actions/checkout@v7
 
       - name: Detect locale and update PR body
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
         run: |
           chmod +x .github/scripts/pull-request-temp-apply.sh
           ./.github/scripts/pull-request-temp-apply.sh
-        env:
-          # `GITHUB_TOKEN`은 GitHub Actions에서 자동으로 제공되는 하나의 임시 토큰으로 GitHub API에 접근할 수 있도록 사용된다.
-          # Warning: 해당 토큰은 임시 토큰이지만 Organizations나 Enterprise 환경에서 설정된 정책에 따라 권한이 제한될 수 있다.
-          # 따라서 필요한 권한이 모두 부여되지 않을 수 있으며, 민감한 작업에는 별도의 Personal Access Token(PAT)을 사용하는 것이 안전하다.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
