@@ -7,107 +7,178 @@ fail() {
   exit 1
 }
 
-warn() {
+warning() {
   echo "::warning::$1"
 }
 
-require_command() {
-  local command_name="$1"
-  if ! command -v "$command_name" >/dev/null 2>&1; then
-    fail "Required command not found: $command_name"
+require_commandline() {
+  local var_name="$1"
+  if ! command -v "$var_name" &> /dev/null; then
+    fail "Command line argument $var_name is required."
   fi
 }
 
-require_command jq
-require_command curl
+require_commandline jq
+require_commandline curl
 
-# PR 정보 요청에 필요한 GitHub 환경 변수를 Array 형태로 정의
-GITHUB_REQUIRED_ENV=(
-    "GITHUB_TOKEN" # 0
-    "GITHUB_REPOSITORY" # 1 
-    "GITHUB_EVENT_PATH" # 2
-    "GITHUB_API_URL" # 3
+GITHUB_REQUIRED_ENVIRONMENT=(
+  "GITHUB_TOKEN"
+  "GITHUB_REPOSITORY"
+  "GITHUB_EVENT_PATH"
+  "GITHUB_API_URL"
 )
 
-# 필수 GitHub 환경 변수가 설정되어 있는지 확인
-for env_var in "${GITHUB_REQUIRED_ENV[@]}"; do
-  if [ -z "${!env_var:-}" ]; then
-    fail "$env_var is required."
+for var in "${GITHUB_REQUIRED_ENVIRONMENT[@]}"; do
+  if [[ -z "${!var:-}" ]]; then
+    fail "Environment variable $var is not set."
   fi
 done
 
-# PR 번호와 작성자 로그인 정보를 GitHub 이벤트 페이로드에서 추출
-PR_NUMBER="$(jq -r '.pull_request.number // empty' "${!GITHUB_REQUIRED_ENV[2]}")"
-AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "${!GITHUB_REQUIRED_ENV[2]}")"
+EVENT_PATH="${GITHUB_EVENT_PATH}"
+API_URL="${GITHUB_API_URL:-https://api.github.com}"
+REPOSITORY="${GITHUB_REPOSITORY}"
 
-# GitHub 이벤트 페이로드 파일이 존재하는지 확인
-if [ ! -f "${!GITHUB_REQUIRED_ENV[2]:-}" ]; then
-    fail "GitHub event payload file does not exist: ${!GITHUB_REQUIRED_ENV[2]}"
+if [ ! -f "$EVENT_PATH" ]; then
+  fail "GitHub event payload file does not exist: $EVENT_PATH"
 fi
 
-# GitHub API URL이 설정되어 있지 않으면 기본값으로 설정
-if [ -z "${!GITHUB_REQUIRED_ENV[3]:-}" ]; then
-  export "${!GITHUB_REQUIRED_ENV[3]}"="https://api.github.com"
+if [ -n "${GITHUB_API_URL:-}" ]; then
+  warning "GITHUB_API_URL is set to: $API_URL"
+else
+  warning "GITHUB_API_URL is not set. Using default: $API_URL"
 fi
 
-# PR 번호와 작성자 로그인 정보가 올바르게 추출되었는지 확인
-if [ -z "$PR_NUMBER" ] || [ -z "$AUTHOR_LOGIN" ]; then
+PULL_REQUEST_NUMBER="$(jq -r '.pull_request.number // empty' "$EVENT_PATH")"
+AUTHOR_LOGIN="$(jq -r '.pull_request.user.login // empty' "$EVENT_PATH")"
+COMMIT_SHA="$(jq -r '.pull_request.head.sha // empty' "$EVENT_PATH")"
+BRANCH_NAME="$(jq -r '.pull_request.head.ref // empty' "$EVENT_PATH")"
+
+if [ -z "$PULL_REQUEST_NUMBER" ] || [ -z "$AUTHOR_LOGIN" ] || [ -z "$COMMIT_SHA" ] || [ -z "$BRANCH_NAME" ]; then
   fail "No pull_request payload found or required fields are missing."
 fi
 
-# 작성자 정보를 GitHub API를 통해 조회
-USER_RESPONSE="$(
-
+COMMITS_RESPONSE="$(
   curl -fsSL \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer $GITHUB_TOKEN" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$GITHUB_API_URL/users/$AUTHOR_LOGIN"
+    "$API_URL/repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER/commits"
 )"
 
-LOCATION="$(printf '%s' "$USER_RESPONSE" | jq -r '.location // ""' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-LOCATION_LOWER="$(printf '%s' "$LOCATION" | tr '[:upper:]' '[:lower:]')"
-
-LOCALE="en"
-if printf '%s' "$LOCATION_LOWER" | grep -Eq 'south korea|republic of korea' || printf '%s' "$LOCATION" | grep -Eq '대한민국|한국'; then
-  LOCALE="ko"
+COMMIT_SHA_LIST="$(printf '%s' "$COMMITS_RESPONSE" | jq -r '.[].sha' | paste -sd '\n' -)"
+if [ -z "$COMMIT_SHA_LIST" ]; then
+  fail "Failed to load commit SHAs for the pull request."
 fi
 
-TEMPLATE_DIR=".github/PULL_REQUEST_TEMPLATE"
-if [ ! -d "$TEMPLATE_DIR" ]; then
-  fail "Template directory not found: $TEMPLATE_DIR"
+CHANGED_FILES_RESPONSE="$(
+  curl -fsSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "$API_URL/repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER/files?per_page=100"
+)"
+
+DOC_ONLY=true
+if [ -n "$CHANGED_FILES_RESPONSE" ] && [ "$CHANGED_FILES_RESPONSE" != "[]" ]; then
+  while IFS= read -r file_name; do
+    [ -n "$file_name" ] || continue
+    case "$file_name" in
+      *.md|*.mdx|*.markdown)
+        ;;
+      *)
+        DOC_ONLY=false
+        ;;
+    esac
+  done <<< "$(printf '%s' "$CHANGED_FILES_RESPONSE" | jq -r '.[].filename // empty')"
 fi
 
-pick_template_by_locale() {
-  local target_locale="$1"
-  shopt -s nullglob
-  local candidates=("$TEMPLATE_DIR"/*."$target_locale".md)
-  shopt -u nullglob
+BRANCH_NAME_LOWER="$(printf '%s' "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]')"
+LABELS_TO_ADD=()
 
-  if [ "${#candidates[@]}" -eq 0 ]; then
-    return 1
+if [ "$DOC_ONLY" = true ]; then
+  LABELS_TO_ADD+=("document")
+else
+  LABELS_TO_ADD+=("enhancement")
+fi
+
+case "$BRANCH_NAME_LOWER" in
+  *refactor*) LABELS_TO_ADD+=("refactor") ;;
+  *bug*|*fix*|*hotfix*|*bugfix*) LABELS_TO_ADD+=("bug") ;;
+  *release*) LABELS_TO_ADD+=("release") ;;
+esac
+
+declare -A SEEN=()
+FINAL_LABELS=()
+for label in "${LABELS_TO_ADD[@]}"; do
+  if [ -n "$label" ] && [ -z "${SEEN[$label]+x}" ]; then
+    FINAL_LABELS+=("$label")
+    SEEN["$label"]=1
   fi
+done
 
-  printf '%s\n' "${candidates[@]}" | sort -f | head -n 1
+ensure_label() {
+  local label_name="$1"
+  local label_color="$2"
+  local exists
+
+  exists="$(curl -fsSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "$API_URL/repos/$REPOSITORY/labels/$label_name" 2>/dev/null || true)"
+
+  if [ -z "$exists" ]; then
+    curl -fsSL -X POST \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Content-Type: application/json" \
+      "$API_URL/repos/$REPOSITORY/labels" \
+      -d "$(jq -n --arg name "$label_name" --arg color "$label_color" '{name: $name, color: $color}')" >/dev/null 2>&1 || true
+  fi
 }
 
-if [ "$LOCALE" = "ko" ]; then
-  TEMPLATE_PATH="$(
-    pick_template_by_locale "ko" \
-    || pick_template_by_locale "kr" \
-    || true
-  )"
-else
-  TEMPLATE_PATH="$(pick_template_by_locale "en" || true)"
+for label_name in "document" "enhancement" "refactor" "bug" "release"; do
+  case "$label_name" in
+    document) ensure_label "$label_name" "0075ca" ;;
+    enhancement) ensure_label "$label_name" "a2eeef" ;;
+    refactor) ensure_label "$label_name" "d4c5f9" ;;
+    bug) ensure_label "$label_name" "d73a4a" ;;
+    release) ensure_label "$label_name" "0e8a16" ;;
+  esac
+done
+
+LABELS_JSON="$(printf '%s\n' "${FINAL_LABELS[@]}" | jq -R . | jq -s -c .)"
+
+curl -fsSL -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -H "Content-Type: application/json" \
+  "$API_URL/repos/$REPOSITORY/issues/$PULL_REQUEST_NUMBER/labels" \
+  -d "$(jq -n --argjson labels "$LABELS_JSON" '{labels: $labels}')" >/dev/null
+
+USER_RESPONSE="$(
+  curl -fsSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "$API_URL/users/$AUTHOR_LOGIN"
+)"
+
+if [ -z "$USER_RESPONSE" ]; then
+  fail "Failed to fetch user information from GitHub API."
 fi
 
-if [ -z "$TEMPLATE_PATH" ]; then
-  warn "No .$LOCALE.md template found. Falling back to .en.md."
-  TEMPLATE_PATH="$(pick_template_by_locale "en" || true)"
+AUTHOR_ID="$(jq -r '.id // empty' <<< "$USER_RESPONSE")"
+
+if [ -z "$AUTHOR_ID" ]; then
+  fail "Failed to extract author ID from GitHub API response."
 fi
 
-if [ -z "$TEMPLATE_PATH" ]; then
-  fail "No PR template found. Expected at least one .en.md file in .github/PULL_REQUEST_TEMPLATE."
+TEMPLATE_PATH=".github/PULL_REQUEST_TEMPLATE/pull_request_template.md"
+if [ ! -f "$TEMPLATE_PATH" ]; then
+  fail "PR template not found: $TEMPLATE_PATH"
 fi
 
 if [ ! -r "$TEMPLATE_PATH" ]; then
@@ -115,6 +186,7 @@ if [ ! -r "$TEMPLATE_PATH" ]; then
 fi
 
 PR_BODY="$(cat "$TEMPLATE_PATH")"
+PR_BODY="${PR_BODY//__COMMIT_SHA__/$COMMIT_SHA_LIST}"
 
 PAYLOAD="$(jq -n --arg body "$PR_BODY" '{body: $body}')"
 
@@ -123,7 +195,7 @@ curl -fsSL -X PATCH \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
-  "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+  "$API_URL/repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER" \
   -d "$PAYLOAD" >/dev/null
 
-echo "author=$AUTHOR_LOGIN, location='$LOCATION', locale=$LOCALE, template='$TEMPLATE_PATH'"
+echo "author=$AUTHOR_LOGIN, template='$TEMPLATE_PATH', branch=$BRANCH_NAME, commit_sha=$COMMIT_SHA_LIST, labels=${FINAL_LABELS[*]}"
