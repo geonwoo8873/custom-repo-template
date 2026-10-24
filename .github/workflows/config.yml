@@ -1,9 +1,15 @@
-name: Test PR Automation
+name: PR Automation
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, closed]
 #   issues:
 #     types: [opened, reopened, edited, closed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run the workflow on'
+        required: false
+        default: 'main'
 
 permissions:
   contents: read
@@ -11,7 +17,7 @@ permissions:
   issues: write
 
 jobs:
-  pull_request_localization:
+  pull_request_apply:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -24,6 +30,7 @@ jobs:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_API_URL: ${{ github.api_url }}
+          PR_ASSIGNEES: ${{ github.event.pull_request.user.login }}
         run: |
           chmod +x .github/scripts/pull-request-temp-apply.sh
           ./.github/scripts/pull-request-temp-apply.sh
