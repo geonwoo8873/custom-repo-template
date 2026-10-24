@@ -1,7 +1,14 @@
-`10/23/2026 23:28:00`
-- Modified the process so that Actions no longer query the location via the GitHub API when a developer pushes code changes (after a commit).
-- Enhanced the system to automatically include the relevant commit SHA-256 hash in the body of the Pull Request template.
+#### 10/23/2026 23:00
+- Modified the GitHub Actions workflow so that it no longer queries the location via the GitHub API when a user pushes code changes.
+- Updated the Pull Request template to automatically include the SHA-256 hash of the committed code.
 
-`10/23/2026 23:30:00`
-- GitHub Actions have been updated to automatically assign different labels to pull requests (PRs) based on factors such as the types of files modified or the name of the branch used.
-- Initially, this system will support the following labels—"document," "enhancement," "refactor," "bug," and "release"—to supplement or replace manual labeling by contributors. Future updates will include logic to automatically assign specific labels based on branch naming conventions, such as those for `feature/**` or `hotfix` branches.
+#### 10/23/2026 23:30
+- Configured GitHub Actions to automatically apply different labels to Pull Requests based on the types of files changed (e.g., code vs. documentation) or the branch name.
+- Initial supported labels include "document," "enhancement," "refactor," "bug," and "release." Future updates will include logic to assign specific labels based on branch naming conventions, such as `feature/**` or `hotfix`.
+
+#### 10/24/2026 09:06
+- Enhanced the Pull Request template to include both the SHA hash and the corresponding commit message on the same line.
+
+#### 10/24/2026 09:55
+- Added a feature where the Actions Bot automatically assigns users to a Pull Request upon its creation. 
+- This update reduces the need for manual intervention by users and facilitates easier log tracking.
