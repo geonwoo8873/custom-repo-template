@@ -191,4 +191,3 @@ curl -fsSL -X PATCH \
   -d "$PAYLOAD" >/dev/null
 
 echo "author=$AUTHOR_LOGIN, template='$TEMPLATE_PATH', branch=$BRANCH_NAME, labels=${FINAL_LABELS[*]}"
-
