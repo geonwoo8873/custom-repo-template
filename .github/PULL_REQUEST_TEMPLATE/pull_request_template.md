@@ -9,10 +9,11 @@
 <!-- Explain why this change is needed. -->
 
 ## Key Changes
-- Changes:
+
+#### Changes:
 
 
-- List of commit SHAs:
+#### List of commit SHAs:
   __COMMIT_SHA__
 
 
