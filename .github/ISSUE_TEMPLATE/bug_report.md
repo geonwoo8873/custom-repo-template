@@ -1,38 +1,53 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
+name: Bug Report
+about: Report a bug to help improve the project.
+title: '[Bug] '
+labels: 'bug'
 assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Bug Description
+<!-- Clearly and concisely describe the problem. -->
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## Steps to Reproduce
+<!-- List the steps to reproduce the bug. -->
+1. 
+2. 
+3. 
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Expected Behavior
+<!-- Describe what you expected to happen. -->
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Actual Behavior
+<!-- Describe what actually happened. -->
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+## Logs and Screenshots
+<!-- Include error messages, console logs, or screenshots. Remove sensitive information such as tokens and passwords. -->
+```text
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+```
 
-**Additional context**
-Add any other context about the problem here.
+## Environment
+- OS: <!-- e.g., Windows 11, macOS 15, Ubuntu 24.04 -->
+- Browser/Runtime: <!-- e.g., Chrome 130, Node.js 22 -->
+- Version/Commit: <!-- e.g., v1.2.0 or commit SHA -->
+
+## Severity
+- [ ] Critical - Service outage or data loss
+- [ ] High - A major feature is unusable
+- [ ] Medium - A workaround is available
+- [ ] Low - Minor inconvenience or UI issue
+
+## Frequency
+- [ ] Always
+- [ ] Intermittently
+- [ ] Happened only once
+
+## Additional Context
+<!-- Include related issues, suspected causes, or possible solutions. -->
+
+## Checklist
+- [ ] I searched for existing issues to avoid duplicates.
+- [ ] I confirmed the bug also occurs in the latest version.
+- [ ] I have not included sensitive information such as tokens or passwords.
