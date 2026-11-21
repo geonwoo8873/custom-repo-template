@@ -57,6 +57,12 @@ env:
   PR_ASSIGNEES: username,team-lead
 ```
 
+### 5. Trivy Image Vulnerability Scan
+
+When a new pull request is opened, Trivy scans the temporary example image `nginx:latest` and adds a severity summary plus up to 10 key findings to the **Security Scan (Trivy)** section of the PR body. It shows a review-focused summary rather than the complete vulnerability report.
+
+This is currently a template-level example target. To scan the actual application image, change the image reference in the workflow to a registry image or an image built from the pull request. The scan also runs when Dockerfile or Compose changes are pushed to `main`, and it can be triggered manually.
+
 ## Repository Structure
 
 ```text
@@ -66,9 +72,9 @@ env:
 ├── scripts/
 │   └── pull-request-temp-apply.sh
 ├── workflows/
-│   └── config.yml
+│   ├── config.yml
+│   └── image-security.yml
 README.md
-README.en.md
 ```
 
 ## Example PR Template
@@ -99,8 +105,9 @@ This format keeps the PR purpose clear while preserving a structured, automated 
 4. It inspects the changed files and assigns a primary label: `document` or `enhancement`.
 5. It inspects the branch name and optionally adds `refactor`, `bug`, or `release`.
 6. Missing labels are created if necessary.
-7. The commit summary replaces the `__COMMIT_SHA__` placeholder in the PR template.
-8. The PR author is set as the default assignee unless a custom assignee list is provided.
+7. Trivy scans the temporary `nginx:latest` image and returns a summary report.
+8. The commit summary replaces `__COMMIT_SHA__`, and the Trivy summary replaces `__TRIVY_REPORT__` in the PR template.
+9. The PR author is set as the default assignee unless a custom assignee list is provided.
 
 ## Label Rules
 
@@ -126,6 +133,8 @@ The workflow passes the following environment variables to the script:
 
 The main workflow logic is defined in [.github/workflows/config.yml](.github/workflows/config.yml), while the PR update behavior lives in [.github/scripts/pull-request-temp-apply.sh](.github/scripts/pull-request-temp-apply.sh).
 
+The Trivy image scan and report generation are managed by [.github/workflows/image-security.yml](.github/workflows/image-security.yml). The reusable workflow is called by `config.yml` before the PR body is updated.
+
 ## How to Use It
 
 1. Open or update a pull request in the repository.
@@ -139,6 +148,8 @@ The main workflow logic is defined in [.github/workflows/config.yml](.github/wor
 - Human-written PR descriptions are still preferable for explaining the business or technical intent of the change.
 - Automatically generated commit summaries are best used as structured metadata rather than a complete replacement for meaningful documentation.
 - GitHub Actions behavior depends on repository permissions, branch conditions, and token scope.
+- Trivy results currently describe `nginx:latest` as a temporary example image and do not represent an application image built by a pull request.
+- If the Trivy workflow fails, no report summary is available and the PR body may not be updated.
 - For public repositories, workflow permissions and event triggers should be reviewed carefully to avoid accidental privilege exposure.
 
 ## License
