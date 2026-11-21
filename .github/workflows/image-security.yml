@@ -1,0 +1,74 @@
+name: Image Security Trivy Scan
+
+on:
+  workflow_call:
+    outputs:
+      summary:
+        description: Markdown summary of the Trivy image scan
+        value: ${{ jobs.trivy_scan.outputs.summary }}
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.Dockerfile'
+      - '**/docker-compose.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy_scan:
+    runs-on: ubuntu-24.04
+    outputs:
+      summary: ${{ steps.report.outputs.summary }}
+    steps:
+      - name: Scan temporary Nginx image
+        uses: aquasecurity/trivy-action@v0.6.0
+        with:
+          scan-type: image
+          image-ref: nginx:latest
+          format: json
+          output: trivy-results.json
+          exit-code: '0'
+
+      - name: Build PR summary
+        id: report
+        shell: bash
+        run: |
+          summary="$(jq -r '
+            [.Results[]?.Vulnerabilities[]?] as $v
+            | "**Image:** `nginx:latest` (temporary example image)\n"
+              + "**Vulnerabilities:** CRITICAL "
+              + ([$v[] | select(.Severity == "CRITICAL")] | length | tostring)
+              + ", HIGH "
+              + ([$v[] | select(.Severity == "HIGH")] | length | tostring)
+              + ", MEDIUM "
+              + ([$v[] | select(.Severity == "MEDIUM")] | length | tostring)
+              + ", LOW "
+              + ([$v[] | select(.Severity == "LOW")] | length | tostring)
+              + (if ($v | length) == 0 then
+                   "\n\nNo vulnerabilities were found."
+                 else
+                   "\n\n**Key findings (maximum 10):**\n"
+                   + ([$v | sort_by(
+                         if .Severity == "CRITICAL" then 0
+                         elif .Severity == "HIGH" then 1
+                         elif .Severity == "MEDIUM" then 2
+                         else 3
+                         end
+                       ) | .[:10][]
+                       | "- `" + (.VulnerabilityID // "unknown") + "` "
+                         + (.Severity // "UNKNOWN") + " | `"
+                         + (.PkgName // "unknown") + "` "
+                         + (.InstalledVersion // "version unknown") + " -> "
+                         + (.FixedVersion // "no fixed version")]
+                      | join("\n"))
+                 end)
+          ' trivy-results.json)"
+          delimiter="trivy_$(openssl rand -hex 16)"
+          {
+            echo "summary<<${delimiter}"
+            echo "${summary}"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
