@@ -26,6 +26,9 @@
 - Build:
 - Test:
 
+## Security Scan (Trivy)
+__TRIVY_REPORT__
+
 ## Related Issues
 - Closes #
 - Related #
