@@ -17,10 +17,21 @@ x86/
 .DS_Store
 Thumbs.db
 
+# Eclipse
+.classpath
+.project
+.settings/
+
+# IntelliJ project files
+*.iml
+
 #### Programming Language
 # Node.js
 node_modules/
 packages/
+
+# Rust
+target/
 
 # .NET
 bin/
@@ -33,3 +44,19 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Java / Spring Boot
+*.class
+*.log
+*.ctxt
+hs_err_pid*
+.gradle/
+build/
+target/
+out/
+*.jar
+*.war
+*.ear
+*.nar
+!gradle/wrapper/gradle-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
